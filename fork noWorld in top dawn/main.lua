@@ -11,12 +11,64 @@ local PIXEL_SIZE = 4   -- Размер одного пикселя (квадра
 local CHUNK_PIXEL_SIZE = CHUNK_SIZE * PIXEL_SIZE  -- Размер чанка в пикселях
 local screenW = display.contentWidth
 local screenH = display.contentHeight
+local zoom = 1  -- Текущий зум
+local panX = 0  -- Смещение по X
+local panY = 0  -- Смещение по Y
 
 -- Группа для хранения чанков
 local chunkGroup = display.newGroup()
+chunkGroup.x = panX
+chunkGroup.y = panY
+chunkGroup.xScale = zoom
+chunkGroup.yScale = zoom
 
 -- Таблица для хранения сгенерированных чанков, ключ "x_y"
 local chunks = {}
+
+-- Реализация шума Перлина
+local p = {}
+for i = 0, 255 do
+    p[i] = i
+end
+for i = 255, 1, -1 do
+    local j = math.random(0, i)
+    p[i], p[j] = p[j], p[i]
+end
+for i = 0, 255 do
+    p[i + 256] = p[i]
+end
+
+local function fade(t)
+    return t * t * t * (t * (t * 6 - 15) + 10)
+end
+
+local function lerp(a, b, t)
+    return a + t * (b - a)
+end
+
+local function grad(hash, x, y)
+    local h = hash % 4
+    if h == 0 then return x + y
+    elseif h == 1 then return -x + y
+    elseif h == 2 then return x - y
+    else return -x - y end
+end
+
+local function noise(x, y)
+    local xi = math.floor(x) % 256
+    local yi = math.floor(y) % 256
+    local xf = x - math.floor(x)
+    local yf = y - math.floor(y)
+    local u = fade(xf)
+    local v = fade(yf)
+    local aa = p[p[xi] + yi]
+    local ab = p[p[xi] + yi + 1]
+    local ba = p[p[xi + 1] + yi]
+    local bb = p[p[xi + 1] + yi + 1]
+    local x1 = lerp(grad(aa, xf, yf), grad(ba, xf - 1, yf), u)
+    local x2 = lerp(grad(ab, xf, yf - 1), grad(bb, xf - 1, yf - 1), u)
+    return lerp(x1, x2, v)
+end
 
 -- Функция для преобразования HSL в RGB
 local function hslToRgb(h, s, l)
@@ -54,7 +106,7 @@ local function generateChunk(cx, cy)
         for j = 0, CHUNK_SIZE - 1 do
             local nx = cx * CHUNK_SIZE + i
             local ny = cy * CHUNK_SIZE + j
-            local noise = math.noise(nx * 0.05, ny * 0.05)  -- Масштабируем шум для разнообразия
+            local noise = noise(nx * 0.05, ny * 0.05)  -- Масштабируем шум для разнообразия
             -- Преобразуем шум в цвет: hue на основе значения шума
             local hue = ((noise + 1) / 2) * 360  -- От -1 до 1 -> 0 до 360
             local r, g, b = hslToRgb(hue, 0.7, 0.5)  -- Насыщенность и яркость фиксированы
@@ -75,17 +127,24 @@ end
 
 -- Функция для проверки и генерации новых чанков при перемещении
 local function checkAndGenerateChunks()
-    -- Вычисляем видимый диапазон чанков
-    local left = math.floor((-chunkGroup.x) / CHUNK_PIXEL_SIZE) - 1
-    local right = math.floor((-chunkGroup.x + screenW) / CHUNK_PIXEL_SIZE) + 1
-    local top = math.floor((-chunkGroup.y) / CHUNK_PIXEL_SIZE) - 1
-    local bottom = math.floor((-chunkGroup.y + screenH) / CHUNK_PIXEL_SIZE) + 1
+    -- Вычисляем видимый диапазон чанков с учётом зума
+    local left = math.floor((-chunkGroup.x) / (CHUNK_PIXEL_SIZE * zoom)) - 1
+    local right = math.floor((-chunkGroup.x + screenW) / (CHUNK_PIXEL_SIZE * zoom)) + 1
+    local top = math.floor((-chunkGroup.y) / (CHUNK_PIXEL_SIZE * zoom)) - 1
+    local bottom = math.floor((-chunkGroup.y + screenH) / (CHUNK_PIXEL_SIZE * zoom)) + 1
 
     for i = left, right do
         for j = top, bottom do
             generateChunk(i, j)
         end
     end
+end
+
+-- Функция для обновления зума всех чанков
+local function updateZoom()
+    chunkGroup.xScale = zoom
+    chunkGroup.yScale = zoom
+    checkAndGenerateChunks()
 end
 
 -- Кнопки для перемещения
@@ -128,3 +187,24 @@ local rightBtn = widget.newButton{
 }
 rightBtn.x = screenW - 100
 rightBtn.y = screenH / 2
+
+-- Кнопки для зума
+local zoomInBtn = widget.newButton{
+    label = "+",
+    onRelease = function()
+        zoom = zoom * 1.2
+        updateZoom()
+    end
+}
+zoomInBtn.x = screenW / 2 + 50
+zoomInBtn.y = screenH - 50
+
+local zoomOutBtn = widget.newButton{
+    label = "-",
+    onRelease = function()
+        zoom = zoom / 1.2
+        updateZoom()
+    end
+}
+zoomOutBtn.x = screenW / 2 - 50
+zoomOutBtn.y = screenH - 50
