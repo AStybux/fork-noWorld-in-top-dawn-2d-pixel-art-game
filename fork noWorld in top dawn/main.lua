@@ -4,14 +4,27 @@
 
 local widget = require("widget")
 local display = require("display")
+local json = require("json")  -- Добавлено для сохранения JSON
+local lfs = require("lfs")    -- Добавлено для работы с файловой системой
+local config = require("assets.config")  -- Загрузка конфигурации
 
 -- Константы
 local screenW = display.contentWidth
 local screenH = display.contentHeight
 
+-- Функция для вычисления значений из конфига
+local function getValue(expr)
+    if type(expr) == "number" then return expr end
+    local env = {screenW = screenW, screenH = screenH}
+    local func = loadstring("return " .. expr)
+    setfenv(func, env)
+    return func()
+end
+
 -- Переменные состояния
 local state = "menu"  -- "menu", "settings", "game"
 local controlMode = "arrows"  -- "arrows" или "mouse"
+local zoom = 1  -- Текущий зум
 
 -- Группы для сцен
 local menuGroup = display.newGroup()
@@ -30,26 +43,105 @@ function createMenu()
     clearScreen()
     state = "menu"
 
-    local title = display.newText("Меню", screenW / 2, screenH / 4, native.systemFont, 40)
-    title:setFillColor(1, 1, 1)
+    -- Фон экрана
+    display.setDefault("background", config.ui.background.color[1], config.ui.background.color[2], config.ui.background.color[3])
+
+    local title = display.newText(config.ui.menu.title.text, getValue(config.ui.menu.title.x), getValue(config.ui.menu.title.y), config.ui.menu.title.font, config.ui.menu.title.size)
+    title:setFillColor(config.ui.menu.title.color[1], config.ui.menu.title.color[2], config.ui.menu.title.color[3])
 
     local playBtn = widget.newButton{
-        label = "Ого",
+        label = config.ui.menu.playBtn.label,
         onRelease = function()
-            startGame()
-        end
+            startGame(true)
+        end,
+        shape = config.ui.menu.playBtn.shape,
+        width = config.ui.menu.playBtn.width,
+        height = config.ui.menu.playBtn.height,
+        fillColor = config.ui.menu.playBtn.fillColor,
+        strokeWidth = config.ui.menu.playBtn.strokeWidth,
+        strokeColor = config.ui.menu.playBtn.strokeColor,
+        labelColor = config.ui.menu.playBtn.labelColor,
+        fontSize = config.ui.menu.playBtn.fontSize
     }
-    playBtn.x = screenW / 2
-    playBtn.y = screenH / 2 - 50
+    playBtn.x = getValue(config.ui.menu.playBtn.x)
+    playBtn.y = getValue(config.ui.menu.playBtn.y)
+
+    local pluginsBtn = widget.newButton{
+        label = config.ui.menu.pluginsBtn.label,
+        onRelease = function()
+            createPlugins()
+        end,
+        shape = config.ui.menu.pluginsBtn.shape,
+        width = config.ui.menu.pluginsBtn.width,
+        height = config.ui.menu.pluginsBtn.height,
+        fillColor = config.ui.menu.pluginsBtn.fillColor,
+        strokeWidth = config.ui.menu.pluginsBtn.strokeWidth,
+        strokeColor = config.ui.menu.pluginsBtn.strokeColor,
+        labelColor = config.ui.menu.pluginsBtn.labelColor,
+        fontSize = config.ui.menu.pluginsBtn.fontSize
+    }
+    pluginsBtn.x = getValue(config.ui.menu.pluginsBtn.x)
+    pluginsBtn.y = getValue(config.ui.menu.pluginsBtn.y)
 
     local settingsBtn = widget.newButton{
-        label = "Настройки",
+        label = config.ui.menu.settingsBtn.label,
         onRelease = function()
             createSettings()
-        end
+        end,
+        shape = config.ui.menu.settingsBtn.shape,
+        width = config.ui.menu.settingsBtn.width,
+        height = config.ui.menu.settingsBtn.height,
+        fillColor = config.ui.menu.settingsBtn.fillColor,
+        strokeWidth = config.ui.menu.settingsBtn.strokeWidth,
+        strokeColor = config.ui.menu.settingsBtn.strokeColor,
+        labelColor = config.ui.menu.settingsBtn.labelColor,
+        fontSize = config.ui.menu.settingsBtn.fontSize
     }
-    settingsBtn.x = screenW / 2
-    settingsBtn.y = screenH / 2 + 50
+    settingsBtn.x = getValue(config.ui.menu.settingsBtn.x)
+    settingsBtn.y = getValue(config.ui.menu.settingsBtn.y)
+end
+
+-- Функция создания меню плагинов
+function createPlugins()
+    clearScreen()
+    state = "plugins"
+
+    local title = display.newText(config.ui.plugins.title.text, getValue(config.ui.plugins.title.x), getValue(config.ui.plugins.title.y), config.ui.plugins.title.font, config.ui.plugins.title.size)
+    title:setFillColor(unpack(config.ui.plugins.title.color))
+
+    local minimapBtn = widget.newButton{
+        label = config.ui.plugins.minimapBtn.label,
+        onRelease = function()
+            -- Заглушка
+        end,
+        shape = config.ui.plugins.minimapBtn.shape,
+        width = config.ui.plugins.minimapBtn.width,
+        height = config.ui.plugins.minimapBtn.height,
+        fillColor = config.ui.plugins.minimapBtn.fillColor,
+        strokeWidth = config.ui.plugins.minimapBtn.strokeWidth,
+        strokeColor = config.ui.plugins.minimapBtn.strokeColor,
+        labelColor = config.ui.plugins.minimapBtn.labelColor,
+        fontSize = config.ui.plugins.minimapBtn.fontSize
+    }
+    minimapBtn.x = getValue(config.ui.plugins.minimapBtn.x)
+    minimapBtn.y = getValue(config.ui.plugins.minimapBtn.y)
+
+    local backBtn = widget.newButton{
+        label = config.ui.plugins.backBtn.label,
+        onRelease = function()
+            createMenu()
+        end,
+        shape = config.ui.plugins.backBtn.shape,
+        width = config.ui.plugins.backBtn.width,
+        height = config.ui.plugins.backBtn.height,
+        fillColor = config.ui.plugins.backBtn.fillColor,
+        strokeWidth = config.ui.plugins.backBtn.strokeWidth,
+        strokeColor = config.ui.plugins.backBtn.strokeColor,
+        labelColor = config.ui.plugins.backBtn.labelColor,
+        fontSize = config.ui.plugins.backBtn.fontSize
+    }
+    backBtn.x = getValue(config.ui.plugins.backBtn.x)
+    backBtn.y = getValue(config.ui.plugins.backBtn.y)
 end
 
 -- Функция создания настроек
@@ -57,67 +149,121 @@ function createSettings()
     clearScreen()
     state = "settings"
 
-    local title = display.newText("Настройки", screenW / 2, screenH / 4, native.systemFont, 40)
-    title:setFillColor(1, 1, 1)
+    local title = display.newText(config.ui.settings.title.text, getValue(config.ui.settings.title.x), getValue(config.ui.settings.title.y), config.ui.settings.title.font, config.ui.settings.title.size)
+    title:setFillColor(unpack(config.ui.settings.title.color))
 
-    local controlLabel = display.newText("Управление картой:", screenW / 2, screenH / 2 - 100, native.systemFont, 30)
-    controlLabel:setFillColor(1, 1, 1)
+    local controlLabel = display.newText(config.ui.settings.controlLabel.text, getValue(config.ui.settings.controlLabel.x), getValue(config.ui.settings.controlLabel.y), config.ui.settings.controlLabel.font, config.ui.settings.controlLabel.size)
+    controlLabel:setFillColor(unpack(config.ui.settings.controlLabel.color))
 
     local arrowsBtn = widget.newButton{
-        label = "Стрелки",
+        label = config.ui.settings.arrowsBtn.label,
         onRelease = function()
             controlMode = "arrows"
             createMenu()
-        end
+        end,
+        shape = config.ui.settings.arrowsBtn.shape,
+        width = config.ui.settings.arrowsBtn.width,
+        height = config.ui.settings.arrowsBtn.height,
+        fillColor = config.ui.settings.arrowsBtn.fillColor,
+        strokeWidth = config.ui.settings.arrowsBtn.strokeWidth,
+        strokeColor = config.ui.settings.arrowsBtn.strokeColor,
+        labelColor = config.ui.settings.arrowsBtn.labelColor,
+        fontSize = config.ui.settings.arrowsBtn.fontSize
     }
-    arrowsBtn.x = screenW / 2 - 100
-    arrowsBtn.y = screenH / 2
+    arrowsBtn.x = getValue(config.ui.settings.arrowsBtn.x)
+    arrowsBtn.y = getValue(config.ui.settings.arrowsBtn.y)
 
     local mouseBtn = widget.newButton{
-        label = "Мышь",
+        label = config.ui.settings.mouseBtn.label,
         onRelease = function()
             controlMode = "mouse"
             createMenu()
-        end
+        end,
+        shape = config.ui.settings.mouseBtn.shape,
+        width = config.ui.settings.mouseBtn.width,
+        height = config.ui.settings.mouseBtn.height,
+        fillColor = config.ui.settings.mouseBtn.fillColor,
+        strokeWidth = config.ui.settings.mouseBtn.strokeWidth,
+        strokeColor = config.ui.settings.mouseBtn.strokeColor,
+        labelColor = config.ui.settings.mouseBtn.labelColor,
+        fontSize = config.ui.settings.mouseBtn.fontSize
     }
-    mouseBtn.x = screenW / 2 + 100
-    mouseBtn.y = screenH / 2
+    mouseBtn.x = getValue(config.ui.settings.mouseBtn.x)
+    mouseBtn.y = getValue(config.ui.settings.mouseBtn.y)
 
     local backBtn = widget.newButton{
-        label = "Назад",
+        label = config.ui.settings.backBtn.label,
         onRelease = function()
             createMenu()
-        end
+        end,
+        shape = config.ui.settings.backBtn.shape,
+        width = config.ui.settings.backBtn.width,
+        height = config.ui.settings.backBtn.height,
+        fillColor = config.ui.settings.backBtn.fillColor,
+        strokeWidth = config.ui.settings.backBtn.strokeWidth,
+        strokeColor = config.ui.settings.backBtn.strokeColor,
+        labelColor = config.ui.settings.backBtn.labelColor,
+        fontSize = config.ui.settings.backBtn.fontSize
     }
-    backBtn.x = screenW / 2
-    backBtn.y = screenH - 100
+    backBtn.x = getValue(config.ui.settings.backBtn.x)
+    backBtn.y = getValue(config.ui.settings.backBtn.y)
 end
 
 -- Функция запуска игры
-function startGame()
+function startGame(withMinimap)
     clearScreen()
     state = "game"
+
+    -- Импорт модуля map
+    local map = require("assets.map")
+
+    -- Очистка старых чанков
+    map.chunks = {}
+    map.chunkColors = {}
+    if map.minimapGroup then
+        map.minimapGroup:removeSelf()
+        map.minimapGroup = nil
+    end
+
+    -- Загрузка сохраненного состояния игры
+    local gameState = {}
+    local gameStatePath = system.pathForFile("gameState.json", system.DocumentsDirectory)
+    if gameStatePath then
+        local file = io.open(gameStatePath, "r")
+        if file then
+            local content = file:read("*a")
+            file:close()
+            gameState = json.decode(content) or {}
+            print("Game state loaded: zoom=" .. (gameState.zoom or "nil") .. ", seed=" .. (gameState.seed or "nil") .. ", panX=" .. (gameState.panX or "nil") .. ", panY=" .. (gameState.panY or "nil"))
+        else
+            print("Failed to open gameState.json for reading")
+        end
+    else
+        print("gameState.json path not found")
+    end
+    zoom = gameState.zoom or 1
 
     -- Константы игры
     local CHUNK_SIZE = 16  -- Размер чанка в точках шума
     local PIXEL_SIZE = 4   -- Размер одного пикселя (квадрата) на экране
     local CHUNK_PIXEL_SIZE = CHUNK_SIZE * PIXEL_SIZE  -- Размер чанка в пикселях
-    local zoom = 1  -- Текущий зум
-    local panX = 0  -- Смещение по X
-    local panY = 0  -- Смещение по Y
+    local currentPanX = gameState.panX or 0  -- Текущая позиция для миникарты
+    local currentPanY = gameState.panY or 0  -- Текущая позиция для миникарты
 
     -- Группа для хранения чанков
     local chunkGroup = display.newGroup()
-    chunkGroup.x = panX
-    chunkGroup.y = panY
+    display.getCurrentStage():insert(chunkGroup)
+    chunkGroup.x = currentPanX
+    chunkGroup.y = currentPanY
     chunkGroup.xScale = zoom
     chunkGroup.yScale = zoom
 
-    -- Таблица для хранения сгенерированных чанков, ключ "x_y"
-    local chunks = {}
+    -- Seed для шума (для детерминированной генерации)
+    local seed = gameState.seed or math.random(1, 1000000)
 
-    -- Реализация шума Перлина
+    -- Реализация шума Перлина с seed
     local p = {}
+    math.randomseed(seed)
     for i = 0, 255 do
         p[i] = i
     end
@@ -185,28 +331,7 @@ function startGame()
 
     -- Функция для генерации чанка по координатам cx, cy
     local function generateChunk(cx, cy)
-        local chunkKey = cx .. "_" .. cy
-        if chunks[chunkKey] then return end  -- Если чанк уже сгенерирован, пропускаем
-
-        local group = display.newGroup()
-        chunkGroup:insert(group)
-        group.x = cx * CHUNK_PIXEL_SIZE
-        group.y = cy * CHUNK_PIXEL_SIZE
-
-        for i = 0, CHUNK_SIZE - 1 do
-            for j = 0, CHUNK_SIZE - 1 do
-                local nx = cx * CHUNK_SIZE + i
-                local ny = cy * CHUNK_SIZE + j
-                local noiseVal = noise(nx * 0.05, ny * 0.05)  -- Масштабируем шум для разнообразия
-                -- Преобразуем шум в цвет: hue на основе значения шума
-                local hue = ((noiseVal + 1) / 2) * 360  -- От -1 до 1 -> 0 до 360
-                local r, g, b = hslToRgb(hue, 0.7, 0.5)  -- Насыщенность и яркость фиксированы
-                local rect = display.newRect(group, i * PIXEL_SIZE, j * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE)
-                rect:setFillColor(r / 255, g / 255, b / 255)
-            end
-        end
-
-        chunks[chunkKey] = group
+        map.generateChunk(cx, cy, chunkGroup, CHUNK_SIZE, PIXEL_SIZE, CHUNK_PIXEL_SIZE, noise, hslToRgb)
     end
 
     -- Генерация начальных чанков вокруг центра (0,0)
@@ -218,96 +343,187 @@ function startGame()
 
     -- Функция для проверки и генерации новых чанков при перемещении
     local function checkAndGenerateChunks()
-        -- Вычисляем видимый диапазон чанков с учётом зума
-        local left = math.floor((-chunkGroup.x) / (CHUNK_PIXEL_SIZE * zoom)) - 1
-        local right = math.floor((-chunkGroup.x + screenW) / (CHUNK_PIXEL_SIZE * zoom)) + 1
-        local top = math.floor((-chunkGroup.y) / (CHUNK_PIXEL_SIZE * zoom)) - 1
-        local bottom = math.floor((-chunkGroup.y + screenH) / (CHUNK_PIXEL_SIZE * zoom)) + 1
-
-        for i = left, right do
-            for j = top, bottom do
-                generateChunk(i, j)
-            end
-        end
+        map.checkAndGenerateChunks(chunkGroup, screenW, screenH, CHUNK_PIXEL_SIZE, zoom, generateChunk)
     end
 
-    -- Функция для обновления зума всех чанков
     local function updateZoom()
         chunkGroup.xScale = zoom
         chunkGroup.yScale = zoom
         checkAndGenerateChunks()
+        if withMinimap then
+            map.updateMinimapView(currentPanX, currentPanY, zoom)
+        end
     end
+
+    -- Создание миникарты, если withMinimap
+    if withMinimap then
+        map.createMinimap(screenW, screenH)
+        display.getCurrentStage():insert(map.minimapGroup)
+        -- Принудительно обновляем миникарту после вставки в сцену
+        timer.performWithDelay(100, function()
+            for key, colors in pairs(map.chunkColors) do
+                local cx, cy = key:match("(-?%d+)_(-?%d+)")
+                cx = tonumber(cx)
+                cy = tonumber(cy)
+                map.updateMinimap(cx, cy)
+            end
+        end)
+    end
+
+    -- Сохранение цветов чанков и состояния игры при выходе из игры
+    Runtime:addEventListener("system", function(event)
+        if event.type == "applicationExit" then
+            map.saveChunkColors("chunkColors.json")
+            -- Сохранение состояния игры
+            local gameStateToSave = {
+                zoom = zoom,
+                seed = seed,
+                panX = currentPanX,
+                panY = currentPanY
+            }
+            local gameStatePath = system.pathForFile("gameState.json", system.DocumentsDirectory)
+            local file = io.open(gameStatePath, "w")
+            if file then
+                file:write(json.encode(gameStateToSave))
+                file:close()
+                print("Saved game state: zoom=" .. zoom .. ", seed=" .. seed .. ", panX=" .. currentPanX .. ", panY=" .. currentPanY)
+            else
+                print("Failed to save game state")
+            end
+        end
+    end)
 
     -- Кнопки для зума
     local zoomInBtn = widget.newButton{
-        label = "+",
+        label = config.ui.game.zoomInBtn.label,
         onRelease = function()
             zoom = zoom * 1.2
             updateZoom()
-        end
+        end,
+        shape = config.ui.game.zoomInBtn.shape,
+        width = config.ui.game.zoomInBtn.width,
+        height = config.ui.game.zoomInBtn.height,
+        fillColor = config.ui.game.zoomInBtn.fillColor,
+        strokeWidth = config.ui.game.zoomInBtn.strokeWidth,
+        strokeColor = config.ui.game.zoomInBtn.strokeColor,
+        labelColor = config.ui.game.zoomInBtn.labelColor,
+        fontSize = config.ui.game.zoomInBtn.fontSize
     }
-    zoomInBtn.x = screenW / 2 + 50
-    zoomInBtn.y = screenH - 50
+    zoomInBtn.x = getValue(config.ui.game.zoomInBtn.x)
+    zoomInBtn.y = getValue(config.ui.game.zoomInBtn.y)
 
     local zoomOutBtn = widget.newButton{
-        label = "-",
+        label = config.ui.game.zoomOutBtn.label,
         onRelease = function()
             zoom = zoom / 1.2
             updateZoom()
-        end
+        end,
+        shape = config.ui.game.zoomOutBtn.shape,
+        width = config.ui.game.zoomOutBtn.width,
+        height = config.ui.game.zoomOutBtn.height,
+        fillColor = config.ui.game.zoomOutBtn.fillColor,
+        strokeWidth = config.ui.game.zoomOutBtn.strokeWidth,
+        strokeColor = config.ui.game.zoomOutBtn.strokeColor,
+        labelColor = config.ui.game.zoomOutBtn.labelColor,
+        fontSize = config.ui.game.zoomOutBtn.fontSize
     }
-    zoomOutBtn.x = screenW / 2 - 50
-    zoomOutBtn.y = screenH - 50
+    zoomOutBtn.x = getValue(config.ui.game.zoomOutBtn.x)
+    zoomOutBtn.y = getValue(config.ui.game.zoomOutBtn.y)
 
-    -- Кнопки для перемещения (только если controlMode == "arrows")
     local upBtn, downBtn, leftBtn, rightBtn
     if controlMode == "arrows" then
         upBtn = widget.newButton{
-            label = "Вверх",
+            label = config.ui.game.upBtn.label,
             onRelease = function()
                 chunkGroup.y = chunkGroup.y + CHUNK_PIXEL_SIZE
+                currentPanY = currentPanY + CHUNK_PIXEL_SIZE
                 checkAndGenerateChunks()
-            end
+                if withMinimap then
+                    map.updateMinimapView(currentPanX, currentPanY, zoom)
+                end
+            end,
+            shape = config.ui.game.upBtn.shape,
+            width = config.ui.game.upBtn.width,
+            height = config.ui.game.upBtn.height,
+            fillColor = config.ui.game.upBtn.fillColor,
+            strokeWidth = config.ui.game.upBtn.strokeWidth,
+            strokeColor = config.ui.game.upBtn.strokeColor,
+            labelColor = config.ui.game.upBtn.labelColor,
+            fontSize = config.ui.game.upBtn.fontSize
         }
-        upBtn.x = screenW / 2
-        upBtn.y = screenH - 100
+        upBtn.x = getValue(config.ui.game.upBtn.x)
+        upBtn.y = getValue(config.ui.game.upBtn.y)
 
         downBtn = widget.newButton{
-            label = "Вниз",
+            label = config.ui.game.downBtn.label,
             onRelease = function()
                 chunkGroup.y = chunkGroup.y - CHUNK_PIXEL_SIZE
+                currentPanY = currentPanY - CHUNK_PIXEL_SIZE
                 checkAndGenerateChunks()
-            end
+                if withMinimap then
+                    map.updateMinimapView(currentPanX, currentPanY, zoom)
+                end
+            end,
+            shape = config.ui.game.downBtn.shape,
+            width = config.ui.game.downBtn.width,
+            height = config.ui.game.downBtn.height,
+            fillColor = config.ui.game.downBtn.fillColor,
+            strokeWidth = config.ui.game.downBtn.strokeWidth,
+            strokeColor = config.ui.game.downBtn.strokeColor,
+            labelColor = config.ui.game.downBtn.labelColor,
+            fontSize = config.ui.game.downBtn.fontSize
         }
-        downBtn.x = screenW / 2
-        downBtn.y = screenH - 50
+        downBtn.x = getValue(config.ui.game.downBtn.x)
+        downBtn.y = getValue(config.ui.game.downBtn.y)
 
         leftBtn = widget.newButton{
-            label = "Влево",
+            label = config.ui.game.leftBtn.label,
             onRelease = function()
                 chunkGroup.x = chunkGroup.x + CHUNK_PIXEL_SIZE
+                currentPanX = currentPanX + CHUNK_PIXEL_SIZE
                 checkAndGenerateChunks()
-            end
+                if withMinimap then
+                    map.updateMinimapView(currentPanX, currentPanY, zoom)
+                end
+            end,
+            shape = config.ui.game.leftBtn.shape,
+            width = config.ui.game.leftBtn.width,
+            height = config.ui.game.leftBtn.height,
+            fillColor = config.ui.game.leftBtn.fillColor,
+            strokeWidth = config.ui.game.leftBtn.strokeWidth,
+            strokeColor = config.ui.game.leftBtn.strokeColor,
+            labelColor = config.ui.game.leftBtn.labelColor,
+            fontSize = config.ui.game.leftBtn.fontSize
         }
-        leftBtn.x = 100
-        leftBtn.y = screenH / 2
+        leftBtn.x = getValue(config.ui.game.leftBtn.x)
+        leftBtn.y = getValue(config.ui.game.leftBtn.y)
 
         rightBtn = widget.newButton{
-            label = "Вправо",
+            label = config.ui.game.rightBtn.label,
             onRelease = function()
                 chunkGroup.x = chunkGroup.x - CHUNK_PIXEL_SIZE
+                currentPanX = currentPanX - CHUNK_PIXEL_SIZE
                 checkAndGenerateChunks()
-            end
+                if withMinimap then
+                    map.updateMinimapView(currentPanX, currentPanY, zoom)
+                end
+            end,
+            shape = config.ui.game.rightBtn.shape,
+            width = config.ui.game.rightBtn.width,
+            height = config.ui.game.rightBtn.height,
+            fillColor = config.ui.game.rightBtn.fillColor,
+            strokeWidth = config.ui.game.rightBtn.strokeWidth,
+            strokeColor = config.ui.game.rightBtn.strokeColor,
+            labelColor = config.ui.game.rightBtn.labelColor,
+            fontSize = config.ui.game.rightBtn.fontSize
         }
-        rightBtn.x = screenW - 100
-        rightBtn.y = screenH / 2
+        rightBtn.x = getValue(config.ui.game.rightBtn.x)
+        rightBtn.y = getValue(config.ui.game.rightBtn.y)
     end
 
-    -- Переменные для перетаскивания (только если controlMode == "mouse")
     local isDragging = false
     local startX, startY
 
-    -- Функция для обработки касаний (перетаскивание)
     local function touchHandler(event)
         if event.phase == "began" then
             isDragging = true
@@ -319,9 +535,14 @@ function startGame()
             local deltaY = event.y - startY
             chunkGroup.x = chunkGroup.x + deltaX
             chunkGroup.y = chunkGroup.y + deltaY
+            currentPanX = currentPanX + deltaX
+            currentPanY = currentPanY + deltaY
             startX = event.x
             startY = event.y
             checkAndGenerateChunks()
+            if withMinimap then
+                map.updateMinimapView(currentPanX, currentPanY, zoom)
+            end
         elseif event.phase == "ended" or event.phase == "cancelled" then
             isDragging = false
             display.getCurrentStage():setFocus(nil)
@@ -329,20 +550,43 @@ function startGame()
         return true
     end
 
-    -- Добавляем слушатель касаний к группе чанков (только если controlMode == "mouse")
     if controlMode == "mouse" then
         chunkGroup:addEventListener("touch", touchHandler)
     end
 
-    -- Кнопка выхода в меню
     local menuBtn = widget.newButton{
-        label = "Меню",
+        label = config.ui.game.menuBtn.label,
         onRelease = function()
+            -- Сохранение перед выходом в меню
+            map.saveChunkColors("chunkColors.json")
+            local gameStateToSave = {
+                zoom = zoom,
+                seed = seed,
+                panX = currentPanX,
+                panY = currentPanY
+            }
+            local gameStatePath = system.pathForFile("gameState.json", system.DocumentsDirectory)
+            local file = io.open(gameStatePath, "w")
+            if file then
+                file:write(json.encode(gameStateToSave))
+                file:close()
+                print("Saved game state on menu exit: zoom=" .. zoom .. ", seed=" .. seed .. ", panX=" .. currentPanX .. ", panY=" .. currentPanY)
+            else
+                print("Failed to save game state on menu exit")
+            end
             createMenu()
-        end
+        end,
+        shape = config.ui.game.menuBtn.shape,
+        width = config.ui.game.menuBtn.width,
+        height = config.ui.game.menuBtn.height,
+        fillColor = config.ui.game.menuBtn.fillColor,
+        strokeWidth = config.ui.game.menuBtn.strokeWidth,
+        strokeColor = config.ui.game.menuBtn.strokeColor,
+        labelColor = config.ui.game.menuBtn.labelColor,
+        fontSize = config.ui.game.menuBtn.fontSize
     }
-    menuBtn.x = screenW - 100
-    menuBtn.y = 50
+    menuBtn.x = getValue(config.ui.game.menuBtn.x)
+    menuBtn.y = getValue(config.ui.game.menuBtn.y)
 end
 
 -- Запуск меню при старте
